@@ -1,15 +1,16 @@
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, Message
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, Message
 import asyncio
 import sqlite3
 import random
 
 # Token
-BOT_TOKEN = "7919646429:AAFnVGXZqbtDOtaX5sSoOjC4MHNMLMIDhXQ"
+BOT_TOKEN = "7919646429:AAEnNv63u9mz58Wj5T-pmsFO-oOqdQtL298"
 
 # Admin ID
 ADMIN_ID = 1432311261  # O'zingizning Telegram ID'ingizni yozing
+CHANNEL_ID = "@personal_blog_fayzulla"  # Kanal ID
 
 # Bot va dispatcher yaratish
 bot = Bot(token=BOT_TOKEN)
@@ -31,16 +32,54 @@ cursor.execute('''
 ''')
 conn.commit()
 
-# Telefon raqamini so‘rash tugmasi
+# Tugmalar
+join_button = InlineKeyboardButton(text="📢 Kanalga a'zo bo‘lish", url="https://t.me/personal_blog_fayzulla")
+giveaway_button = KeyboardButton(text="🎁 Giveawayda qatnashish")
+main_markup = ReplyKeyboardMarkup(keyboard=[[giveaway_button]], resize_keyboard=True)
+join_markup = InlineKeyboardMarkup(inline_keyboard=[[join_button]])
+
 phone_button = KeyboardButton(text="📞 Telefon raqam yuborish", request_contact=True)
 phone_markup = ReplyKeyboardMarkup(keyboard=[[phone_button]], resize_keyboard=True)
+
 
 # Start komandasi
 @dp.message(Command("start"))
 async def start_handler(message: Message):
-    await message.answer("Assalomu alaykum! Giveaway ro‘yxatiga qo‘shilish uchun telefon raqamingizni yuboring.", reply_markup=phone_markup)
+    main_markup = ReplyKeyboardMarkup(
+        keyboard=[
+            [giveaway_button],
+            [KeyboardButton(text="📢 Kanalga a'zo bo‘lish")]
+        ],
+        resize_keyboard=True
+    )
+    await message.answer("Assalomu alaykum! Giveaway ro‘yxatiga qo‘shilish uchun quyidagi tugmalardan birini tanlang:", reply_markup=main_markup)
 
-# Telefon raqamini qabul qilish (aiogram 3.x uchun to‘g‘ri usul)
+
+
+# Giveawayga qatnashish tugmasi
+@dp.message(F.text == "🎁 Giveawayda qatnashish")
+async def giveaway_handler(message: Message):
+    user_id = message.from_user.id
+    member = await bot.get_chat_member(CHANNEL_ID, user_id)
+
+    if member.status in ["member", "administrator", "creator"]:
+        await message.answer("📞 Iltimos, telefon raqamingizni yuboring:", reply_markup=phone_markup)
+    else:
+        await message.answer(
+            "📢 Siz hali kanalga a'zo bo‘lmagansiz. Avval kanalga a'zo bo‘ling va qaytadan urinib ko‘ring.",
+            reply_markup=join_markup)
+
+@dp.message(F.text == "📢 Kanalga a'zo bo‘lish")
+async def join_channel(message: Message):
+    join_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📢 Kanalga a'zo bo‘lish", url="https://t.me/personal_blog_fayzulla")]
+        ]
+    )
+    await message.answer("📢 Kanalga qo‘shilish uchun quyidagi tugmani bosing:", reply_markup=join_markup)
+
+
+# Telefon raqamini qabul qilish
 @dp.message(F.content_type == types.ContentType.CONTACT)
 async def contact_handler(message: Message):
     user_id = message.from_user.id
@@ -52,15 +91,15 @@ async def contact_handler(message: Message):
         cursor.execute("INSERT INTO users (user_id, username, fullname, phone) VALUES (?, ?, ?, ?)",
                        (user_id, username, fullname, phone_number))
         conn.commit()
-        await message.answer("✅ Muvaffaqiyatli ro‘yxatdan o‘tdingiz! G‘oliblar tez orada aniqlanadi.", reply_markup=types.ReplyKeyboardRemove())
+        await message.answer("✅ Muvaffaqiyatli ro‘yxatdan o‘tdingiz! G‘oliblar tez orada aniqlanadi.",
+                             reply_markup=types.ReplyKeyboardRemove())
     except:
         await message.answer("⚠ Siz allaqachon ro‘yxatdan o‘tgan bo‘lishingiz mumkin.")
 
 
+# Ro‘yxatdagi foydalanuvchilarni olish
 @dp.message(Command("users"))
 async def get_users(message: types.Message):
-    ADMIN_ID = 1432311261  # O'zingizning Telegram ID'ingizni kiriting
-
     if message.from_user.id != ADMIN_ID:
         await message.answer("❌ Siz bu buyruqni ishlata olmaysiz!")
         return
@@ -76,22 +115,20 @@ async def get_users(message: types.Message):
     await message.answer(f"📋 Ro‘yxatdagi foydalanuvchilar:\n\n{users_list}")
 
 
-
+# Foydalanuvchilarni tozalash
 @dp.message(Command("clear_users"))
 async def clear_users_handler(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         await message.answer("❌ Siz bu buyruqni ishlata olmaysiz!")
         return
 
-    conn = sqlite3.connect("giveaway.db")
-    cursor = conn.cursor()
-
     cursor.execute("DELETE FROM users")
     conn.commit()
-    conn.close()
 
     await message.answer("✅ Barcha foydalanuvchilar bazadan o‘chirildi.")
-# Giveaway g‘oliblarini aniqlash (faqat admin ishlatishi mumkin)
+
+
+# Giveaway g‘oliblarini aniqlash
 @dp.message(Command("winners"))
 async def winners_handler(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -112,19 +149,19 @@ async def winners_handler(message: Message):
         phone_last4 = winner[3][-4:]  # Telefon raqamining oxirgi 4 raqami
         result_text += f"{i}. @{winner[1] or winner[2]} - {phone_last4}\n"
 
-    # Faqat adminga yuborish
     await bot.send_message(ADMIN_ID, result_text)
 
-    # G‘oliblarga xabar yuborish
     for winner in winners:
         try:
             await bot.send_message(winner[0], "🎉 Tabriklaymiz! Siz giveaway g‘oliblaridan birisiz!")
         except:
             pass  # Agar foydalanuvchi botni bloklagan bo‘lsa, xatolik bo‘ladi
 
+
 # Asosiy asyncio tsikli
 async def main():
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
