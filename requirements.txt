@@ -1,2 +1,4 @@
 aiogram
 python-dotenv
+flask
+nest_asyncio
