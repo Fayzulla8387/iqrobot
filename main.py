@@ -12,7 +12,7 @@ ADMIN_ID = 1432311261
 CHANNEL_ID = "@personal_blog_fayzulla"
 
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # SQLite bazaga ulanish
 conn = sqlite3.connect("giveaway.db", check_same_thread=False)
@@ -130,11 +130,12 @@ async def winners_handler(message: types.Message):
 
 # --- Webhook Route --- #
 @app.route("/", methods=["POST"])
-async def telegram_webhook():
+def telegram_webhook():
     json_str = request.get_data().decode("utf-8")
     update = types.Update.de_json(json_str)
-    await dp.process_update(update)
+    asyncio.run(dp.process_update(update))
     return "OK"
+
 
 # --- Run Flask --- #
 if __name__ == "__main__":
