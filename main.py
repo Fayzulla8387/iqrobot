@@ -9,14 +9,11 @@ from aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton, Message
 )
 from flask import Flask, request
-import json
 
 # Environment o'zgaruvchilari
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
+BOT_TOKEN = os.environ.get("BOT_TOKEN","7919646429:AAEnNv63u9mz58Wj5T-pmsFO-oOqdQtL298")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "1432311261"))
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "@personal_blog_fayzulla")
-WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "https://yourdomain.com")
-WEBHOOK_PATH = "/webhook"
 
 # Bot va Dispatcher
 bot = Bot(token=BOT_TOKEN)
@@ -101,7 +98,7 @@ async def giveaway_handler(message: Message):
             )
     except Exception as e:
         await message.answer("❌ Xato yuz berdi. Qaytadan urinib ko'ring.")
-        print(f"Error in giveaway_handler: {e}")
+        print(f"Error: {e}")
 
 
 @dp.message(F.text == "📢 Kanalga a'zo bo'lish")
@@ -136,7 +133,7 @@ async def contact_handler(message: Message):
         await message.answer("⚠️ Siz allaqachon ro'yxatdan o'tgan bo'lishingiz mumkin.")
     except Exception as e:
         await message.answer("❌ Xato yuz berdi.")
-        print(f"Error in contact_handler: {e}")
+        print(f"Error: {e}")
 
 
 # --- Admin Commands --- #
@@ -160,8 +157,7 @@ async def get_users(message: types.Message):
         users_list = "\n".join([f"👤 {u['fullname']} (@{u['username']})" for u in users])
         await message.answer(f"📋 Ro'yxatdagi foydalanuvchilar:\n\n{users_list}")
     except Exception as e:
-        await message.answer("❌ Xato yuz berdi.")
-        print(f"Error in get_users: {e}")
+        print(f"Error: {e}")
 
 
 @dp.message(Command("clear_users"))
@@ -178,8 +174,7 @@ async def clear_users_handler(message: types.Message):
         conn.close()
         await message.answer("✅ Barcha foydalanuvchilar bazadan o'chirildi.")
     except Exception as e:
-        await message.answer("❌ Xato yuz berdi.")
-        print(f"Error in clear_users_handler: {e}")
+        print(f"Error: {e}")
 
 
 @dp.message(Command("winners"))
@@ -206,98 +201,38 @@ async def winners_handler(message: types.Message):
             phone_last4 = winner['phone'][-4:] if winner['phone'] else "****"
             result_text += f"{i}. @{winner['username']} - {phone_last4}\n"
 
-        await bot.send_message(ADMIN_ID, result_text)
+        asyncio.run(bot.send_message(ADMIN_ID, result_text))
 
         for winner in winners:
             try:
-                await bot.send_message(
+                asyncio.run(bot.send_message(
                     winner['user_id'],
                     "🎉 Tabriklaymiz! Siz giveaway g'oliblaridan birisiz!"
-                )
-            except Exception as e:
-                print(f"Could not notify winner {winner['user_id']}: {e}")
+                ))
+            except:
+                pass
     except Exception as e:
-        await message.answer("❌ Xato yuz berdi.")
-        print(f"Error in winners_handler: {e}")
+        print(f"Error: {e}")
 
 
-# --- Webhook Setup Routes --- #
-@app.route("/webhook_setup", methods=["GET"])
-async def setup_webhook():
-    """Webhook o'rnatish uchun endpoint"""
-    try:
-        webhook_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
-        await bot.set_webhook(url=webhook_url)
-        return {"status": "success", "message": f"Webhook o'rnatildi: {webhook_url}"}, 200
-    except Exception as e:
-        print(f"Webhook setup error: {e}")
-        return {"status": "error", "message": str(e)}, 500
-
-
-@app.route("/webhook_delete", methods=["GET"])
-async def delete_webhook():
-    """Webhookni o'chirish"""
-    try:
-        await bot.delete_webhook()
-        return {"status": "success", "message": "Webhook o'chirildi"}, 200
-    except Exception as e:
-        print(f"Webhook delete error: {e}")
-        return {"status": "error", "message": str(e)}, 500
-
-
-# --- Webhook Route --- #
-@app.route(WEBHOOK_PATH, methods=["POST"])
-async def telegram_webhook():
-    """Telegram xabarlarni qabul qilish"""
+# --- Webhook --- #
+@app.route("/webhook", methods=["POST"])
+def webhook():
     try:
         data = request.get_json()
-        if data:
-            update = types.Update.model_validate(data)
-            await dp.process_update(update)
+        update = types.Update.model_validate(data)
+        asyncio.run(dp.process_update(update))
         return "OK", 200
     except Exception as e:
-        print(f"Webhook error: {e}")
+        print(f"Error: {e}")
         return "ERROR", 400
 
 
-# --- Health Check --- #
-@app.route("/health", methods=["GET"])
-def health_check():
-    return {"status": "ok"}, 200
-
-
-# --- Async Context Manager --- #
-async def on_startup():
-    """Bot ishga tushganda"""
-    try:
-        webhook_url = f"{WEBHOOK_URL}{WEBHOOK_PATH}"
-        await bot.set_webhook(url=webhook_url)
-        print(f"✅ Webhook o'rnatildi: {webhook_url}")
-    except Exception as e:
-        print(f"❌ Webhook o'rnatishda xato: {e}")
-
-
-async def on_shutdown():
-    """Bot o'chib ketganda"""
-    try:
-        await bot.delete_webhook()
-        print("✅ Webhook o'chirildi")
-    except Exception as e:
-        print(f"❌ Webhook o'chirishda xato: {e}")
-
-
-# --- Main --- #
+# --- Run --- #
 if __name__ == "__main__":
+    import nest_asyncio
+
+    nest_asyncio.apply()
+
     PORT = int(os.environ.get("PORT", 5000))
-
-
-    # Startup va shutdown
-    @app.before_request
-    def before_request():
-        pass
-
-
-    print(f"🚀 Bot {PORT} portda webhook rejimida ishga tushdi")
-    print(f"📍 Webhook URL: {WEBHOOK_URL}{WEBHOOK_PATH}")
-
     app.run(host="0.0.0.0", port=PORT, debug=False)
