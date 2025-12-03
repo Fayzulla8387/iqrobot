@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton,
-    InlineKeyboardMarkup, InlineKeyboardButton, Message
+    InlineKeyboardMarkup, InlineKeyboardButton, Message, Update
 )
 from flask import Flask, request
 
@@ -200,12 +200,12 @@ async def winners_handler(message: types.Message):
     except Exception as e:
         print(f"Error: {e}")
 
-# --- Webhook --- #
+# --- Webhook (400 xatosiz) --- #
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.get_json()
-        update = types.Update.model_validate(data)
+        data = request.get_json(force=True)  # force=True JSON olishni majburlaydi
+        update = Update(**data)              # Aiogram Update object yaratish
         asyncio.create_task(dp.process_update(update))
         return "OK", 200
     except Exception as e:
