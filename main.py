@@ -204,13 +204,18 @@ async def winners_handler(message: types.Message):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.get_json(force=True)  # force=True JSON olishni majburlaydi
-        update = Update(**data)              # Aiogram Update object yaratish
+        data = request.get_json(force=True)  # Telegram JSON majburlab olinadi
+        if not data:
+            print("Webhook Error: no JSON received")
+            return "NO JSON", 400
+
+        update = types.Update(**data)       # Aiogram Update object
         asyncio.create_task(dp.process_update(update))
         return "OK", 200
     except Exception as e:
-        print(f"Webhook Error: {e}")
+        print(f"Webhook Error: {e}, data: {data}")
         return "ERROR", 400
+
 
 # --- Run Flask server --- #
 if __name__ == "__main__":
