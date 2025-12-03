@@ -10,26 +10,24 @@ from aiogram.types import (
 )
 from flask import Flask, request
 
-# Environment o'zgaruvchilari
-BOT_TOKEN = os.environ.get("BOT_TOKEN","7919646429:AAEnNv63u9mz58Wj5T-pmsFO-oOqdQtL298")
+# --- Environment o'zgaruvchilari --- #
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "1432311261"))
 CHANNEL_ID = os.environ.get("CHANNEL_ID", "@personal_blog_fayzulla")
 
-# Bot va Dispatcher
+# --- Bot va Dispatcher --- #
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-
-# SQLite bazaga ulanish
+# --- SQLite bazaga ulanish --- #
 def get_db():
     conn = sqlite3.connect("giveaway.db")
     conn.row_factory = sqlite3.Row
     return conn
 
-
+# Baza yaratish
 conn = get_db()
 cursor = conn.cursor()
-
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,11 +40,10 @@ CREATE TABLE IF NOT EXISTS users (
 conn.commit()
 conn.close()
 
-# Flask app yaratish
+# --- Flask app --- #
 app = Flask(__name__)
 
-
-# Tugmalarni yaratish
+# --- Tugmalar --- #
 def get_main_markup():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -56,20 +53,17 @@ def get_main_markup():
         resize_keyboard=True
     )
 
-
 def get_phone_markup():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="📞 Telefon raqam yuborish", request_contact=True)]],
         resize_keyboard=True
     )
 
-
 join_button_markup = InlineKeyboardMarkup(
     inline_keyboard=[[
-        InlineKeyboardButton(text="📢 Kanalga a'zo bo'lish", url=f"https://t.me/{CHANNEL_ID.replace('@', '')}")
+        InlineKeyboardButton(text="📢 Kanalga a'zo bo'lish", url=f"https://t.me/{CHANNEL_ID.replace('@','')}")
     ]]
 )
-
 
 # --- Aiogram Handlers --- #
 @dp.message(Command("start"))
@@ -79,11 +73,9 @@ async def start_handler(message: Message):
         reply_markup=get_main_markup()
     )
 
-
 @dp.message(F.text == "🎁 Giveawayda qatnashish")
 async def giveaway_handler(message: Message):
     user_id = message.from_user.id
-
     try:
         member = await bot.get_chat_member(CHANNEL_ID, user_id)
         if member.status in ["member", "administrator", "creator"]:
@@ -100,14 +92,12 @@ async def giveaway_handler(message: Message):
         await message.answer("❌ Xato yuz berdi. Qaytadan urinib ko'ring.")
         print(f"Error: {e}")
 
-
 @dp.message(F.text == "📢 Kanalga a'zo bo'lish")
 async def join_channel(message: Message):
     await message.answer(
         "📢 Kanalga qo'shilish uchun quyidagi tugmani bosing:",
         reply_markup=join_button_markup
     )
-
 
 @dp.message(F.content_type == types.ContentType.CONTACT)
 async def contact_handler(message: Message):
@@ -135,7 +125,6 @@ async def contact_handler(message: Message):
         await message.answer("❌ Xato yuz berdi.")
         print(f"Error: {e}")
 
-
 # --- Admin Commands --- #
 @dp.message(Command("users"))
 async def get_users(message: types.Message):
@@ -159,13 +148,11 @@ async def get_users(message: types.Message):
     except Exception as e:
         print(f"Error: {e}")
 
-
 @dp.message(Command("clear_users"))
 async def clear_users_handler(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         await message.answer("❌ Siz bu buyruqni ishlata olmaysiz!")
         return
-
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -175,7 +162,6 @@ async def clear_users_handler(message: types.Message):
         await message.answer("✅ Barcha foydalanuvchilar bazadan o'chirildi.")
     except Exception as e:
         print(f"Error: {e}")
-
 
 @dp.message(Command("winners"))
 async def winners_handler(message: types.Message):
@@ -201,11 +187,11 @@ async def winners_handler(message: types.Message):
             phone_last4 = winner['phone'][-4:] if winner['phone'] else "****"
             result_text += f"{i}. @{winner['username']} - {phone_last4}\n"
 
-        asyncio.run(bot.send_message(ADMIN_ID, result_text))
+        asyncio.create_task(bot.send_message(ADMIN_ID, result_text))
 
         for winner in winners:
             try:
-                asyncio.run(bot.send_message(
+                asyncio.create_task(bot.send_message(
                     winner['user_id'],
                     "🎉 Tabriklaymiz! Siz giveaway g'oliblaridan birisiz!"
                 ))
@@ -214,25 +200,22 @@ async def winners_handler(message: types.Message):
     except Exception as e:
         print(f"Error: {e}")
 
-
 # --- Webhook --- #
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
         data = request.get_json()
         update = types.Update.model_validate(data)
-        asyncio.run(dp.process_update(update))
+        asyncio.create_task(dp.process_update(update))
         return "OK", 200
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Webhook Error: {e}")
         return "ERROR", 400
 
-
-# --- Run --- #
+# --- Run Flask server --- #
 if __name__ == "__main__":
     import nest_asyncio
-
     nest_asyncio.apply()
 
     PORT = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=PORT, debug=False)
+    app.run(host="0.0.0.0", port=PORT)
